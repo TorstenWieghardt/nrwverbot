@@ -247,6 +247,16 @@ footer p{font-size:.72rem;color:rgba(122,146,176,.4)}
 .player-card:hover .player-weapon{opacity:1;filter:drop-shadow(0 0 6px var(--neon))}
 .player-weapon svg{width:100%;height:100%;stroke:var(--neon);fill:none;stroke-width:1.6}
 
+/* LEETIFY RATING BADGE */
+.player-leetify{display:flex;align-items:center;gap:.35rem;margin-top:.3rem;font-size:.72rem;font-weight:600;color:var(--yellow);letter-spacing:.03em}
+.leetify-mark{width:11px;height:11px;fill:var(--yellow);opacity:.85}
+
+/* LEETIFY TAB */
+.leetify-recent{border-top:1px solid var(--rule);padding-top:.4rem}
+.leetify-match-row{display:flex;justify-content:space-between;padding:.5rem .2rem;font-size:.85rem;border-bottom:1px solid var(--rule)}
+.leetify-match-row:last-child{border-bottom:none}
+.leetify-attribution{margin-top:1.2rem;text-align:center;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mid);opacity:.6}
+
 </style>
 </head>
 <body>
@@ -264,6 +274,7 @@ footer p{font-size:.72rem;color:rgba(122,146,176,.4)}
     </div>
     <div class="modal-tabs">
       <button class="modal-tab active" id="tab-stats" onclick="switchTab('stats')">📊 CS2 Stats</button>
+      <button class="modal-tab" id="tab-leetify" onclick="switchTab('leetify')">📈 Leetify</button>
       <button class="modal-tab" id="tab-inv" onclick="switchTab('inv')">🎒 Inventar</button>
       <button class="modal-tab" id="tab-profile" onclick="switchTab('profile')">👤 Profil</button>
     </div>
@@ -512,6 +523,10 @@ async function loadRoster() {
           acc: g('total_shots_fired')>0 ? Math.round(g('total_shots_hit')/g('total_shots_fired')*100)+'%' : '—',
         };
       } catch { p._stats = null; }
+      try {
+        const ld = await workerFetch('leetify_profile', { steamid: p.steamid });
+        p._leetify = (ld && !ld.notFound && !ld.error) ? ld : null;
+      } catch { p._leetify = null; }
     }));
 
     // Render
@@ -543,6 +558,12 @@ function renderCard(p) {
   const kd   = p._stats ? p._stats.kd : '—';
   const wins = p._stats ? (p._stats.wins||0).toLocaleString() : '—';
   const weaponIcon = /sniper|awp/i.test(role) ? WEAPON_AWP : WEAPON_RIFLE;
+  const leetifyRating = p._leetify?.ranks?.premier
+    ? `<div class="player-leetify" title="Leetify Premier Rank">
+         <svg viewBox="0 0 16 16" class="leetify-mark"><path d="M2 14V2h2v10h6v2H2z"/></svg>
+         ${p._leetify.ranks.premier.toLocaleString()}
+       </div>`
+    : '';
   return `<div class="player-card" onclick='openModal(${JSON.stringify(p.steamid)})'>
     ${badge}
     ${avatar}
@@ -550,6 +571,7 @@ function renderCard(p) {
       <div class="player-name">${escHtml(p.personaname)}</div>
       <div class="player-role">${role}</div>
       <div class="player-hint">Klicken für Stats & Inventar</div>
+      ${leetifyRating}
     </div>
     <div class="player-weapon" title="${role}">${weaponIcon}</div>
     <div class="player-kd-block">
@@ -569,7 +591,7 @@ async function openModal(steamid) {
   document.getElementById('m-avatar').src = p.avatarfull || p.avatarmedium || '';
   document.getElementById('m-name').textContent = p.personaname;
   document.getElementById('m-sub').textContent  = p.gameid==CS2_APPID ? '🎮 Spielt gerade CS2' : p.personastate>0 ? '🟢 Online' : '⚫ Offline';
-  ['stats','inv','profile'].forEach(t => {
+  ['stats','leetify','inv','profile'].forEach(t => {
     document.getElementById('tab-'+t).classList.toggle('active', t===currentTab);
   });
 
@@ -588,9 +610,10 @@ function closeModal(e) {
 
 function switchTab(tab) {
   currentTab = tab;
-  ['stats','inv','profile'].forEach(t =>
+  ['stats','leetify','inv','profile'].forEach(t =>
     document.getElementById('tab-'+t).classList.toggle('active', t===tab));
   if (tab==='stats')   renderStatsTab(currentPlayer);
+  if (tab==='leetify') renderLeetifyTab(currentPlayer);
   if (tab==='inv')     renderInvTab(currentPlayer);
   if (tab==='profile') renderProfileTab(currentPlayer);
 }
@@ -612,6 +635,41 @@ function renderStatsTab(p) {
     ['Spielstunden', s.hours+'h'],
   ];
   b.innerHTML = `<div class="stats-grid">${items.map(([l,v])=>`<div class="stat-box"><div class="val">${v}</div><div class="lbl">${l}</div></div>`).join('')}</div>`;
+}
+
+function renderLeetifyTab(p) {
+  const b = document.getElementById('modal-body');
+  const lf = p._leetify;
+  if (!lf) {
+    b.innerHTML = `<div class="inv-private">📵 Kein Leetify-Profil gefunden oder privat.<br>
+      <a href="https://leetify.com" target="_blank" style="color:var(--neon)">Auf leetify.com registrieren →</a>
+      </div>`;
+    return;
+  }
+  const items = [
+    ['Premier Rank', lf.ranks?.premier?.toLocaleString() ?? '—'],
+    ['Leetify Rating', lf.rating?.overall != null ? lf.rating.overall.toFixed(2) : '—'],
+    ['Win Rate', lf.winrate != null ? Math.round(lf.winrate*100)+'%' : '—'],
+    ['Matches', lf.total_matches?.toLocaleString() ?? '—'],
+    ['Aim Rating', lf.rating?.aim != null ? lf.rating.aim.toFixed(2) : '—'],
+    ['Utility Rating', lf.rating?.utility != null ? lf.rating.utility.toFixed(2) : '—'],
+  ];
+  const recent = (lf.recent_matches || []).slice(0, 5);
+  const recentHtml = recent.length
+    ? `<div class="leetify-recent">
+        <div class="lbl" style="margin:1.2rem 0 .6rem;color:var(--mid);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase">Letzte Matches</div>
+        ${recent.map(m => `
+          <div class="leetify-match-row">
+            <span>${escHtml(m.map_name || '—')}</span>
+            <span style="color:var(--mid)">${m.finished_at ? new Date(m.finished_at).toLocaleDateString('de-DE') : ''}</span>
+          </div>`).join('')}
+       </div>`
+    : '';
+  b.innerHTML = `
+    <div class="stats-grid">${items.map(([l,v])=>`<div class="stat-box"><div class="val">${v}</div><div class="lbl">${l}</div></div>`).join('')}</div>
+    ${recentHtml}
+    <div class="leetify-attribution">Data Provided by Leetify</div>
+  `;
 }
 
 async function renderInvTab(p) {
