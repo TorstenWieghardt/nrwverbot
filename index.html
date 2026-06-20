@@ -648,11 +648,11 @@ function renderLeetifyTab(p) {
   }
   const items = [
     ['Premier Rank', lf.ranks?.premier?.toLocaleString() ?? '—'],
-    ['Leetify Rating', lf.rating?.overall != null ? lf.rating.overall.toFixed(2) : '—'],
+    ['Leetify Rating', lf.ranks?.leetify != null ? lf.ranks.leetify.toFixed(2) : '—'],
     ['Win Rate', lf.winrate != null ? Math.round(lf.winrate*100)+'%' : '—'],
     ['Matches', lf.total_matches?.toLocaleString() ?? '—'],
-    ['Aim Rating', lf.rating?.aim != null ? lf.rating.aim.toFixed(2) : '—'],
-    ['Utility Rating', lf.rating?.utility != null ? lf.rating.utility.toFixed(2) : '—'],
+    ['Aim Rating', lf.rating?.aim != null ? lf.rating.aim.toFixed(1) : '—'],
+    ['Utility Rating', lf.rating?.utility != null ? lf.rating.utility.toFixed(1) : '—'],
   ];
   const recent = (lf.recent_matches || []).slice(0, 5);
   const recentHtml = recent.length
