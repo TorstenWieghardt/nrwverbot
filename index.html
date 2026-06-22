@@ -1249,70 +1249,36 @@ function parseDachDetail(raw) {
   const maps = [];
   const players = [];
 
-  // Detect map score lines: "13 7 | 6" or "10 5 | 5" pattern
-  // Maps appear after a map name line (Overpass, Inferno, Ancient, Mirage, Dust2, Nuke, Vertigo, Anubis, Train)
   const MAP_NAMES = /^(Overpass|Inferno|Ancient|Mirage|Dust2|Nuke|Vertigo|Anubis|Train|Cache|Cobblestone|Office|Italy)$/i;
   const SCORE_LINE = /^(\d+)\s+(\d+)\s*\|\s*(\d+)$/;
 
-  let currentMap = null;
-  let nrwTeamFound = false;
-  let nrwIsTeam1 = null; // will detect from overall score context
-
-  // Find which team is NRWVERBOT (look for "nrwverbot" or "nrw verbot" in first few lines)
-  const CLAN = 'nrwverbot';
-  let team1name = '', team2name = '';
-  // Lines 0,1 = team names typically
-  for (let i = 0; i < Math.min(6, lines.length); i++) {
-    if (lines[i].toLowerCase().replace(/\s+/g,'').includes(CLAN)) {
-      if (!team1name) { team1name = lines[i]; nrwIsTeam1 = true; }
-      else { team2name = lines[i]; nrwIsTeam1 = false; }
-    }
-  }
-  // Simpler: scan all lines for nrw
-  // Just parse maps first, then assign based on overall match score
-  // Overall score line pattern: single digit alone = BO3 score
-  let overallScores = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (/^\d$/.test(lines[i]) && i < 8) overallScores.push({val: parseInt(lines[i]), idx: i});
-  }
-  // team1score at idx~2, team2score at idx~6
-  const t1score = overallScores[0]?.val ?? 0;
-  const t2score = overallScores[1]?.val ?? 0;
-
-  // Detect team names (lines 0 and 4 roughly)
-  // Actually: line[1]=team1, line[~5]=team2 based on sample
-  // Easier: find which name contains nrwverbot
-  let nrwTeamNum = 2; // default assume team2
+  // Find which team is NRWVERBOT
+  let nrwTeamNum = 2;
   for (let i = 0; i < Math.min(10, lines.length); i++) {
     if (lines[i].toLowerCase().replace(/[\s-]/g,'').includes('nrwverbot')) {
-      nrwTeamNum = i < 4 ? 1 : 2;
-      break;
+      nrwTeamNum = i < 4 ? 1 : 2; break;
     }
   }
 
-  // Parse maps
+  // Parse maps — two score lines per map: line1=team1 score, line2=team2 score
+  let currentMap = null;
+  let mapLine1score = null;
   for (let i = 0; i < lines.length; i++) {
     if (MAP_NAMES.test(lines[i])) {
-      currentMap = lines[i];
+      currentMap = lines[i]; mapLine1score = null;
     } else if (currentMap && SCORE_LINE.test(lines[i])) {
-      const m = lines[i].match(SCORE_LINE);
-      // Format: "halftime1 half2 | overtime" or just final scores
-      // In sample: "13 7 | 6" = 13 rounds team1 first half, 7 = team2 first half, |6 = overtime?
-      // Actually from sample: Overpass: "13 7 | 6" and "10 5 | 5"
-      // These look like two lines = T side and CT side scores
-      // Simpler: next two lines after map name = [team1total, team2total] maybe
-      // From the actual sample:
-      // Overpass: 13 7 | 6 / 10 5 | 5 → team1=13+10? no...
-      // Let's just grab the first number of each line as scores
-      const s1 = parseInt(m[1]);
-      const s2 = parseInt(m[2]);
-      // If two score lines per map, take first line as the map result
-      if (!maps.find(mp => mp.name === currentMap)) {
-        const nrwScore = nrwTeamNum === 1 ? s1 : s2;
-        const oppScore = nrwTeamNum === 1 ? s2 : s1;
-        maps.push({ name: currentMap, nrwScore, oppScore });
+      const firstNum = parseInt(lines[i].match(/^(\d+)/)[1]);
+      if (mapLine1score === null) {
+        mapLine1score = firstNum; // team1 score
+      } else {
+        // team2 score — now we have both
+        if (!maps.find(mp => mp.name === currentMap)) {
+          const nrwScore = nrwTeamNum === 1 ? mapLine1score : firstNum;
+          const oppScore = nrwTeamNum === 1 ? firstNum : mapLine1score;
+          maps.push({ name: currentMap, nrwScore, oppScore });
+        }
+        currentMap = null; mapLine1score = null;
       }
-      currentMap = null;
     }
   }
 
