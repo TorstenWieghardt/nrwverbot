@@ -329,13 +329,10 @@ footer p{font-size:.72rem;color:rgba(122,146,176,.4)}
   <!-- ADMIN PANEL (versteckt) -->
   <div id="admin-panel" style="display:none">
     <div class="api-setup">
-      <h3>⚙️ Admin — Steam API Einrichtung</h3>
-      <label>Cloudflare Worker URL</label>
-      <input type="text" id="worker-url" placeholder="https://nrwverbot.DEINNAME.workers.dev">
-      <p class="api-hint">Trägst du nach dem Worker-Setup ein.</p>
+      <h3>⚙️ Admin — Roster Einrichtung</h3>
       <label>Steam IDs (eine pro Zeile)</label>
       <textarea id="steam-ids" placeholder="76561198000000001&#10;76561198000000002&#10;76561198000000003"></textarea>
-      <p class="api-hint">Steam ID finder: <a href="https://steamid.io" target="_blank">steamid.io</a></p>
+      <p class="api-hint">Steam ID finder: <a href="https://steamid.io" target="_blank">steamid.io</a> — wird zentral gespeichert, gilt für alle Besucher.</p>
       <div class="api-btns">
         <button class="btn-neon" onclick="loadRoster()">▶ Roster laden</button>
         <button class="btn-save" onclick="saveConfig()">💾 Config speichern</button>
@@ -460,7 +457,7 @@ const ROLES = {
   '76561198000000005':'Lurker',
 };
 const CS2_APPID = 730;
-let WORKER = '';
+const WORKER = 'https://nrwverbot.torstenwieghardt.workers.dev';
 let currentPlayer = null;
 let currentTab = 'stats';
 let playersCache = {};
@@ -478,23 +475,24 @@ const WEAPON_AWP = `<svg viewBox="0 0 64 24" xmlns="http://www.w3.org/2000/svg">
 
 
 
-function saveConfig() {
-  localStorage.setItem('nrwv_cfg', JSON.stringify({
-    worker: document.getElementById('worker-url').value.trim(),
-    ids:    document.getElementById('steam-ids').value.trim(),
-  }));
+async function saveConfig() {
   const b = event.target;
-  b.textContent = '✓ Gespeichert!'; b.style.color = 'var(--neon)';
+  b.disabled = true; b.textContent = '⏳ Speichere...';
+  try {
+    await workerPost('save_config', { ids: document.getElementById('steam-ids').value.trim(), pw: ADMIN_PW });
+    b.textContent = '✓ Gespeichert!'; b.style.color = 'var(--neon)';
+  } catch (e) {
+    b.textContent = '⚠️ Fehler'; b.style.color = 'var(--red)';
+  }
+  b.disabled = false;
   setTimeout(() => { b.textContent = '💾 Config speichern'; b.style.color = ''; }, 2000);
 }
 
 // ── ROSTER LADEN ────────────────────────────────────────────────────────────
 async function loadRoster() {
-  WORKER = document.getElementById('worker-url').value.trim();
   const raw = document.getElementById('steam-ids').value.trim();
   const grid = document.getElementById('player-grid');
 
-  if (!WORKER) { showErr('Bitte Worker-URL eingeben!'); return; }
   const ids = raw.split(/[\n,; ]+/).map(s=>s.trim()).filter(s=>/^\d{17}$/.test(s));
   if (!ids.length) { showErr('Keine gültigen Steam IDs (17 Ziffern).'); return; }
 
@@ -743,6 +741,18 @@ async function workerFetch(action, params={}) {
   if (!res.ok) throw new Error('Worker HTTP '+res.status);
   return res.json();
 }
+async function workerPost(action, body={}) {
+  const url = new URL(WORKER);
+  url.searchParams.set('action', action);
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || ('Worker HTTP '+res.status));
+  return data;
+}
 function showErr(msg) {
   document.getElementById('player-grid').innerHTML = `<div class="roster-status error">⚠️ ${msg}</div>`;
 }
@@ -916,24 +926,43 @@ function deleteMatch(idx) {
 
 function clearMatches() {
   if (!confirm('Wirklich ALLE Matches löschen?')) return;
-  localStorage.removeItem('nrwv_matches');
+  saveMatches([]);
   renderMatches();
 }
 
+let matchesCache = [];
+
 function getMatches() {
-  try { return JSON.parse(localStorage.getItem('nrwv_matches') || '[]'); } catch { return []; }
+  return matchesCache;
 }
 
-function saveMatches(arr) {
-  localStorage.setItem('nrwv_matches', JSON.stringify(arr));
+async function saveMatches(arr) {
+  matchesCache = arr;
+  try {
+    await workerPost('save_matches', { matches: arr, pw: ADMIN_PW });
+  } catch (e) {
+    alert('Fehler beim Speichern: ' + e.message);
+  }
+}
+
+async function loadMatchesFromServer() {
+  try {
+    matchesCache = await workerFetch('get_matches');
+  } catch (e) {
+    matchesCache = [];
+  }
 }
 
 // Init matches on load
-window.addEventListener('DOMContentLoaded', () => {
-  const cfg = JSON.parse(localStorage.getItem('nrwv_cfg') || '{}');
-  if (cfg.worker) document.getElementById('worker-url').value = cfg.worker;
-  if (cfg.ids)    document.getElementById('steam-ids').value  = cfg.ids;
-  if (cfg.worker && cfg.ids) loadRoster();
+window.addEventListener('DOMContentLoaded', async () => {
+  // Roster-Config (Steam IDs) zentral vom Worker laden — gilt für alle Besucher
+  try {
+    const cfg = await workerFetch('get_config');
+    if (cfg.ids) document.getElementById('steam-ids').value = cfg.ids;
+    if (cfg.ids) loadRoster();
+  } catch (e) { /* Worker evtl. noch nicht erreichbar — kein Hard-Fail */ }
+
+  await loadMatchesFromServer();
   loadMatchSection();
   initGlitchCanvas();
 });
