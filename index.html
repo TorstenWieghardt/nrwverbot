@@ -257,9 +257,64 @@ footer p{font-size:.72rem;color:rgba(122,146,176,.4)}
 .leetify-match-row:last-child{border-bottom:none}
 .leetify-attribution{margin-top:1.2rem;text-align:center;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mid);opacity:.6}
 
+/* MATCH MODAL */
+.match-modal-overlay{position:fixed;inset:0;background:rgba(5,8,15,.93);z-index:2000;display:flex;align-items:flex-start;justify-content:center;padding:5rem 1rem 2rem;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity .25s}
+.match-modal-overlay.open{opacity:1;pointer-events:all}
+.match-modal{background:var(--panel);border:1px solid var(--rule);border-top:2px solid var(--neon);width:100%;max-width:780px;position:relative}
+.match-modal-header{padding:1.5rem 2rem;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}
+.match-modal-title{font-family:"Rajdhani",sans-serif;font-size:1.4rem;font-weight:700;color:var(--white)}
+.match-modal-meta{font-size:.75rem;color:var(--mid);margin-top:.25rem}
+.match-modal-score{font-family:"Rajdhani",sans-serif;font-size:2.2rem;font-weight:700;text-align:right;line-height:1}
+.match-modal-score.win{color:#2ecc71;text-shadow:0 0 20px rgba(46,204,113,.4)}
+.match-modal-score.loss{color:var(--red);text-shadow:0 0 20px rgba(255,58,58,.4)}
+.match-modal-close{background:none;border:none;color:var(--mid);font-size:1.4rem;cursor:pointer;padding:.3rem;transition:color .2s;flex-shrink:0}
+.match-modal-close:hover{color:var(--white)}
+/* Map scores */
+.match-maps-detail{display:flex;gap:1px;background:var(--rule);border-bottom:1px solid var(--rule)}
+.map-score-block{flex:1;background:var(--bg);padding:1rem;text-align:center}
+.map-score-name{font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:var(--mid);font-weight:600;margin-bottom:.4rem}
+.map-score-nums{font-family:"Rajdhani",sans-serif;font-size:1.5rem;font-weight:700;color:var(--white)}
+.map-score-nums .w{color:#2ecc71}.map-score-nums .l{color:var(--red)}
+.map-score-rounds{font-size:.65rem;color:var(--mid);margin-top:.2rem}
+/* Player stats table */
+.match-stats-section{padding:1.2rem 1.5rem}
+.match-stats-team-label{font-size:.65rem;letter-spacing:.18em;text-transform:uppercase;color:var(--neon);font-weight:600;margin-bottom:.6rem;display:flex;align-items:center;gap:.5rem}
+.match-stats-team-label::before{content:"";display:inline-block;width:14px;height:1px;background:var(--neon)}
+.stats-table{width:100%;border-collapse:collapse;margin-bottom:1.2rem}
+.stats-table th{font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mid);font-weight:600;padding:.5rem .6rem;border-bottom:1px solid var(--rule);text-align:left}
+.stats-table th:not(:first-child){text-align:right}
+.stats-table td{padding:.55rem .6rem;border-bottom:1px solid rgba(0,212,255,.05);font-size:.85rem}
+.stats-table td:not(:first-child){text-align:right;font-family:"Rajdhani",sans-serif;font-size:.95rem}
+.stats-table tr:last-child td{border-bottom:none}
+.stats-table tr:hover td{background:rgba(0,212,255,.04)}
+.stats-player-name{font-family:"Rajdhani",sans-serif;font-weight:700;color:var(--white)}
+.rating-high{color:#2ecc71}.rating-mid{color:var(--yellow)}.rating-low{color:var(--red)}
+.match-card{cursor:pointer}
+.match-card-click-hint{font-size:.6rem;color:rgba(0,212,255,.35);margin-top:.3rem;letter-spacing:.08em}
+
+/* MATCH DETAIL PASTE in admin */
+.match-detail-section{margin-top:1rem;border-top:1px solid var(--rule);padding-top:1rem}
+.match-detail-section label{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mid);display:block;margin-bottom:.4rem;font-weight:600}
+
 </style>
 </head>
 <body>
+
+<!-- MATCH DETAIL MODAL -->
+<div class="match-modal-overlay" id="match-modal" onclick="closeMatchModal(event)">
+  <div class="match-modal" id="match-modal-box">
+    <div class="match-modal-header">
+      <div style="flex:1">
+        <div class="match-modal-title" id="mm-title">—</div>
+        <div class="match-modal-meta" id="mm-meta">—</div>
+      </div>
+      <div class="match-modal-score" id="mm-score"></div>
+      <button class="match-modal-close" onclick="document.getElementById('match-modal').classList.remove('open')">✕</button>
+    </div>
+    <div id="mm-maps"></div>
+    <div id="mm-stats"></div>
+  </div>
+</div>
 
 <!-- MODAL -->
 <div class="modal-overlay" id="modal" onclick="closeModal(event)">
@@ -428,9 +483,23 @@ footer p{font-size:.72rem;color:rgba(122,146,176,.4)}
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- MATCH LIST -->
+    <!-- MATCH DETAIL PASTE -->
+    <div class="api-setup" style="max-width:100%;border-left-color:var(--yellow)">
+      <h3 style="color:var(--yellow)">📊 Match-Details einfügen (Mapscores + Stats)</h3>
+      <label>Welches Match?</label>
+      <select id="detail-match-idx" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);padding:.7rem 1rem;color:var(--white);font-family:'Exo 2',sans-serif;outline:none;margin-bottom:.8rem">
+        <option value="">— Match auswählen —</option>
+      </select>
+      <label>Text von dachcs.de Match-Detailseite einfügen:</label>
+      <textarea id="detail-input" rows="14" placeholder="Delfinreiter eSports&#10;1&#10;Spielklasse 7 Spieltag 7 Best of 3&#10;2&#10;NRW Verbot&#10;Overpass&#10;13 7 | 6&#10;10 5 | 5&#10;Inferno&#10;...&#10;Player&#10;K-D&#10;...&#10;NM&#10;68-51&#10; 33.3%&#10;109.2&#10;68.9%&#10;1.51"></textarea>
+      <p class="api-hint">Einfach den kompletten Text der Match-Detailseite kopieren und einfügen. Mapscores und Spielerstats werden automatisch erkannt.</p>
+      <div class="api-btns">
+        <button class="btn-neon" onclick="saveMatchDetail()">💾 Details speichern</button>
+        <span id="detail-status" style="font-size:.78rem;color:var(--mid);align-self:center"></span>
+      </div>
+    </div>
+  </div>
   <div id="match-list"></div>
 </section>
 
@@ -842,15 +911,16 @@ function renderMatches() {
     const scoreHtml = m.result === 'upcoming'
       ? `<div class="match-score upcoming">SOON</div>`
       : `<div class="match-score ${m.result==='loss'?'loss':''}">${escHtml(m.score||'?')} ${m.result==='win'?'✓':'✗'}</div>`;
-    return `<div class="match-card ${cls}">
+    return `<div class="match-card ${cls}" onclick="openMatchModal(${i})" style="cursor:pointer">
       <div class="match-date"><b>${day}</b><span>${mon}</span></div>
       <div class="match-info">
         <div class="match-opponent">vs. ${escHtml(m.opponent)}</div>
         ${m.league?`<div class="match-league">${escHtml(m.league)}</div>`:''}
         ${maps?`<div class="match-maps">${maps}</div>`:''}
+        <div class="match-card-click-hint">▶ Details ansehen</div>
       </div>
       ${scoreHtml}
-      <button class="match-delete" onclick="deleteMatch(${i})" title="Löschen">🗑</button>
+      <button class="match-delete" onclick="event.stopPropagation();deleteMatch(${i})" title="Löschen">🗑</button>
     </div>`;
   }).join('');
 
@@ -858,6 +928,8 @@ function renderMatches() {
 
   // Show delete buttons if admin
   if (adminUnlocked) list.querySelectorAll('.match-delete').forEach(b => b.style.display = 'inline-block');
+  // Update detail select
+  populateDetailSelect();
 }
 
 function setMatchFilter(f) { matchFilter = f; renderMatches(); }
@@ -1053,7 +1125,243 @@ function initGlitchCanvas() {
   requestAnimationFrame(frame);
 }
 
-// ── DACHCS.DE PARSER ────────────────────────────────────────────────────────
+// ── MATCH MODAL ──────────────────────────────────────────────────────────────
+function openMatchModal(idx) {
+  const matches = getMatches();
+  const m = matches[idx];
+  if (!m) return;
+
+  // Header
+  document.getElementById('mm-title').textContent = 'vs. ' + m.opponent;
+  const d = m.date ? new Date(m.date).toLocaleDateString('de-DE', {day:'2-digit',month:'long',year:'numeric'}) : '';
+  document.getElementById('mm-meta').textContent = [d, m.league].filter(Boolean).join(' · ');
+
+  const scoreEl = document.getElementById('mm-score');
+  if (m.result === 'upcoming') {
+    scoreEl.textContent = 'SOON'; scoreEl.className = 'match-modal-score';
+  } else {
+    scoreEl.textContent = m.score || '?';
+    scoreEl.className = 'match-modal-score ' + (m.result === 'win' ? 'win' : 'loss');
+  }
+
+  // Map scores
+  const mapsEl = document.getElementById('mm-maps');
+  if (m.details && m.details.maps && m.details.maps.length) {
+    mapsEl.innerHTML = '<div class="match-maps-detail">' +
+      m.details.maps.map(mp => {
+        const nrwW = mp.nrwScore > mp.oppScore;
+        return `<div class="map-score-block">
+          <div class="map-score-name">${escHtml(mp.name)}</div>
+          <div class="map-score-nums">
+            <span class="${nrwW?'w':'l'}">${mp.nrwScore}</span>
+            <span style="color:var(--mid);font-size:1rem"> : </span>
+            <span class="${!nrwW?'w':'l'}">${mp.oppScore}</span>
+          </div>
+        </div>`;
+      }).join('') +
+    '</div>';
+  } else {
+    mapsEl.innerHTML = '<div style="padding:1rem 1.5rem;font-size:.8rem;color:var(--mid);border-bottom:1px solid var(--rule)">Keine Mapdetails gespeichert — über Admin-Panel hinzufügen.</div>';
+  }
+
+  // Player stats
+  const statsEl = document.getElementById('mm-stats');
+  if (m.details && m.details.players && m.details.players.length) {
+    const nrwPlayers = m.details.players.filter(p => p.team === 'nrw');
+    const oppPlayers = m.details.players.filter(p => p.team === 'opp');
+
+    function tableHTML(players, label) {
+      if (!players.length) return '';
+      return `<div class="match-stats-section">
+        <div class="match-stats-team-label">${label}</div>
+        <table class="stats-table">
+          <thead><tr>
+            <th>Spieler</th><th>K-D</th><th>ADR</th><th>KAST</th><th>Rating</th>
+          </tr></thead>
+          <tbody>${players.map(p => {
+            const r = parseFloat(p.rating);
+            const rClass = r >= 1.2 ? 'rating-high' : r >= 1.0 ? 'rating-mid' : 'rating-low';
+            return `<tr>
+              <td><span class="stats-player-name">${escHtml(p.name)}</span></td>
+              <td>${escHtml(p.kd)}</td>
+              <td>${escHtml(p.adr)}</td>
+              <td>${escHtml(p.kast)}</td>
+              <td class="${rClass}">${escHtml(p.rating)}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>`;
+    }
+
+    statsEl.innerHTML = tableHTML(nrwPlayers, 'NRWVERBOT') + tableHTML(oppPlayers, m.opponent);
+  } else {
+    statsEl.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--mid);font-size:.85rem">Keine Spielerstatistiken gespeichert.</div>';
+  }
+
+  document.getElementById('match-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMatchModal(e) {
+  if (e.target === document.getElementById('match-modal')) {
+    document.getElementById('match-modal').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+}
+
+// ── MATCH DETAIL PARSER ──────────────────────────────────────────────────────
+function populateDetailSelect() {
+  const sel = document.getElementById('detail-match-idx');
+  if (!sel) return;
+  const matches = getMatches();
+  sel.innerHTML = '<option value="">— Match auswählen —</option>' +
+    matches.map((m, i) => `<option value="${i}">${m.date||'?'} vs. ${m.opponent} (${m.score||'?'})</option>`).join('');
+}
+
+function saveMatchDetail() {
+  const idx   = parseInt(document.getElementById('detail-match-idx').value);
+  const raw   = document.getElementById('detail-input').value.trim();
+  const status = document.getElementById('detail-status');
+
+  if (isNaN(idx) || document.getElementById('detail-match-idx').value === '') {
+    status.textContent = 'Bitte erst ein Match auswählen!'; status.style.color = 'var(--red)'; return;
+  }
+  if (!raw) { status.textContent = 'Kein Text eingefügt.'; status.style.color = 'var(--red)'; return; }
+
+  const details = parseDachDetail(raw);
+  if (!details.maps.length && !details.players.length) {
+    status.textContent = 'Keine Details erkannt — Text korrekt kopiert?'; status.style.color = 'var(--red)'; return;
+  }
+
+  const matches = getMatches();
+  matches[idx].details = details;
+  saveMatches(matches);
+  status.textContent = `✓ ${details.maps.length} Maps, ${details.players.length} Spieler gespeichert`;
+  status.style.color = '#2ecc71';
+  document.getElementById('detail-input').value = '';
+}
+
+function parseDachDetail(raw) {
+  // Strip markdown links
+  const text = raw.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  const maps = [];
+  const players = [];
+
+  // Detect map score lines: "13 7 | 6" or "10 5 | 5" pattern
+  // Maps appear after a map name line (Overpass, Inferno, Ancient, Mirage, Dust2, Nuke, Vertigo, Anubis, Train)
+  const MAP_NAMES = /^(Overpass|Inferno|Ancient|Mirage|Dust2|Nuke|Vertigo|Anubis|Train|Cache|Cobblestone|Office|Italy)$/i;
+  const SCORE_LINE = /^(\d+)\s+(\d+)\s*\|\s*(\d+)$/;
+
+  let currentMap = null;
+  let nrwTeamFound = false;
+  let nrwIsTeam1 = null; // will detect from overall score context
+
+  // Find which team is NRWVERBOT (look for "nrwverbot" or "nrw verbot" in first few lines)
+  const CLAN = 'nrwverbot';
+  let team1name = '', team2name = '';
+  // Lines 0,1 = team names typically
+  for (let i = 0; i < Math.min(6, lines.length); i++) {
+    if (lines[i].toLowerCase().replace(/\s+/g,'').includes(CLAN)) {
+      if (!team1name) { team1name = lines[i]; nrwIsTeam1 = true; }
+      else { team2name = lines[i]; nrwIsTeam1 = false; }
+    }
+  }
+  // Simpler: scan all lines for nrw
+  // Just parse maps first, then assign based on overall match score
+  // Overall score line pattern: single digit alone = BO3 score
+  let overallScores = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\d$/.test(lines[i]) && i < 8) overallScores.push({val: parseInt(lines[i]), idx: i});
+  }
+  // team1score at idx~2, team2score at idx~6
+  const t1score = overallScores[0]?.val ?? 0;
+  const t2score = overallScores[1]?.val ?? 0;
+
+  // Detect team names (lines 0 and 4 roughly)
+  // Actually: line[1]=team1, line[~5]=team2 based on sample
+  // Easier: find which name contains nrwverbot
+  let nrwTeamNum = 2; // default assume team2
+  for (let i = 0; i < Math.min(10, lines.length); i++) {
+    if (lines[i].toLowerCase().replace(/[\s-]/g,'').includes('nrwverbot')) {
+      nrwTeamNum = i < 4 ? 1 : 2;
+      break;
+    }
+  }
+
+  // Parse maps
+  for (let i = 0; i < lines.length; i++) {
+    if (MAP_NAMES.test(lines[i])) {
+      currentMap = lines[i];
+    } else if (currentMap && SCORE_LINE.test(lines[i])) {
+      const m = lines[i].match(SCORE_LINE);
+      // Format: "halftime1 half2 | overtime" or just final scores
+      // In sample: "13 7 | 6" = 13 rounds team1 first half, 7 = team2 first half, |6 = overtime?
+      // Actually from sample: Overpass: "13 7 | 6" and "10 5 | 5"
+      // These look like two lines = T side and CT side scores
+      // Simpler: next two lines after map name = [team1total, team2total] maybe
+      // From the actual sample:
+      // Overpass: 13 7 | 6 / 10 5 | 5 → team1=13+10? no...
+      // Let's just grab the first number of each line as scores
+      const s1 = parseInt(m[1]);
+      const s2 = parseInt(m[2]);
+      // If two score lines per map, take first line as the map result
+      if (!maps.find(mp => mp.name === currentMap)) {
+        const nrwScore = nrwTeamNum === 1 ? s1 : s2;
+        const oppScore = nrwTeamNum === 1 ? s2 : s1;
+        maps.push({ name: currentMap, nrwScore, oppScore });
+      }
+      currentMap = null;
+    }
+  }
+
+  // Parse players — look for "Player" header line then stat blocks
+  // Pattern after "Player K-D Clutch ADR KAST Ratingest.":
+  // Name, KD, Clutch%, ADR, KAST%, Rating — each on its own line
+  let inStats = false;
+  let currentTeam = 'nrw';
+  let teamCount = 0;
+  const PCT = /^\d+\.?\d*%$/;
+  const KD  = /^\d+-\d+$/;
+  const NUM = /^\d+\.?\d*$/;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] === 'Player' && lines[i+1] === 'K-D') {
+      inStats = true;
+      teamCount++;
+      currentTeam = teamCount === 1 ? 'nrw' : 'opp';
+      i += 5; // skip header cols
+      continue;
+    }
+    if (!inStats) continue;
+
+    // Each player = name, kd, clutch%, adr, kast%, rating
+    const name = lines[i];
+    if (!name || KD.test(name) || PCT.test(name) || NUM.test(name)) continue;
+    if (name === 'Player' && lines[i+1] === 'K-D') {
+      teamCount++; currentTeam = 'opp'; i += 5; continue;
+    }
+
+    // Look ahead for KD
+    if (i+5 < lines.length && KD.test(lines[i+1])) {
+      players.push({
+        name,
+        team: currentTeam,
+        kd:     lines[i+1],
+        clutch: lines[i+2],
+        adr:    lines[i+3],
+        kast:   lines[i+4],
+        rating: lines[i+5],
+      });
+      i += 5;
+    }
+  }
+
+  return { maps, players };
+}
+
+
 function switchImportTab(tab) {
   document.getElementById('import-dach').style.display  = tab === 'dach'   ? '' : 'none';
   document.getElementById('import-manual').style.display = tab === 'manual' ? '' : 'none';
